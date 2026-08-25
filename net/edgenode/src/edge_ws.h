@@ -34,6 +34,7 @@ typedef struct {
     char transport_url[EDGE_URL_MAX + 32U];
     uint8_t node_id[16];
     uint8_t terminal_id[16];
+    uint8_t terminal_output[4096];
     uint64_t session_epoch;
     uint64_t active_revision;
     uint64_t network_probe_nonce;
@@ -50,12 +51,20 @@ typedef struct {
     edge_runtime_config runtime_config;
     edge_acquisition *acquisition;
     uint64_t sequence;
+    uint64_t terminal_output_sequence;
+    uint64_t terminal_output_acked_sequence;
+    uint64_t terminal_output_deadline_ms;
+    uint64_t terminal_input_ack_sequence;
+    size_t terminal_output_size;
     edge_retry retry;
     uint16_t heartbeat_interval_sec;
     bool client_active;
     bool websocket_open;
     bool enrolled;
     bool terminal_open;
+    bool terminal_output_pending;
+    bool terminal_output_sent;
+    bool terminal_input_ack_pending;
     bool firmware_operation_active;
     bool modem_result_pending;
     bool modem_result_received;

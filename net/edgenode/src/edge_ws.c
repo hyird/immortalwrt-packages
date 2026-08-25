@@ -26,7 +26,7 @@
 #include "edge_terminal.h"
 #include "log.h"
 
-#define EDGE_SOFTWARE_VERSION "0.3.17"
+#define EDGE_SOFTWARE_VERSION "0.3.20"
 #define EDGE_OUTBOX_WINDOW 16U
 #define EDGE_CONNECT_TIMEOUT_SEC 30U
 #define EDGE_APPLICATION_HANDSHAKE_TIMEOUT_MS 30000U
@@ -34,10 +34,22 @@
 #define EDGE_APPLICATION_MAX_TIMEOUT_MS 90000U
 #define EDGE_OUTBOX_ACK_TIMEOUT_MS 60000U
 #define EDGE_LIVENESS_CHECK_INTERVAL_SEC 1.0
-#define EDGE_TERMINAL_INPUT_POLL_INTERVAL 0.05
 #define EDGE_TERMINAL_OUTPUT_POLL_INTERVAL 0.01
+#define EDGE_TERMINAL_ACK_TIMEOUT_MS 15000U
 
 static void send_pending_modem_result(edge_ws_session *session);
+
+static void reset_terminal_flow(edge_ws_session *session) {
+    memset(session->terminal_output, 0, sizeof(session->terminal_output));
+    session->terminal_output_size = 0U;
+    session->terminal_output_sequence = 0U;
+    session->terminal_output_acked_sequence = 0U;
+    session->terminal_output_deadline_ms = 0U;
+    session->terminal_input_ack_sequence = 0U;
+    session->terminal_output_pending = false;
+    session->terminal_output_sent = false;
+    session->terminal_input_ack_pending = false;
+}
 
 static edge_ws_session *session_from_client(struct uwsc_client *client) {
     return (edge_ws_session *)((uint8_t *)client - offsetof(edge_ws_session, client));
@@ -385,6 +397,7 @@ static void schedule_reconnect(edge_ws_session *session) {
         edge_terminal_close(session->terminal_id);
         session->terminal_open = false;
     }
+    reset_terminal_flow(session);
     edge_retry_failed(&session->retry, monotonic_ms());
     arm_reconnect_timer(session);
 }
@@ -845,6 +858,19 @@ static void handle_modem_control(edge_ws_session *session,
     ev_timer_start(session->app->loop, &session->modem_timer);
 }
 
+static bool send_terminal_opened(edge_ws_session *session,
+                                 const uint8_t terminal_id[16]) {
+    iot_edge_v1_Envelope *output = &session->app->envelope;
+    if (!init_envelope(session, output))
+        return false;
+    output->which_payload = iot_edge_v1_Envelope_terminal_opened_tag;
+    return edge_protocol_set_bytes(
+               &output->payload.terminal_opened.terminal_id,
+               sizeof(output->payload.terminal_opened.terminal_id.bytes),
+               terminal_id, 16U) &&
+           send_envelope(session, output);
+}
+
 static void send_terminal_close(edge_ws_session *session, const uint8_t terminal_id[16],
                                 int32_t exit_code, const char *reason) {
     iot_edge_v1_Envelope *output = &session->app->envelope;
@@ -860,6 +886,61 @@ static void send_terminal_close(edge_ws_session *session, const uint8_t terminal
     send_envelope(session, output);
 }
 
+static bool send_terminal_data_ack(edge_ws_session *session,
+                                   const uint8_t terminal_id[16],
+                                   uint64_t sequence) {
+    iot_edge_v1_Envelope *output = &session->app->envelope;
+    if (!init_envelope(session, output))
+        return false;
+    output->which_payload = iot_edge_v1_Envelope_terminal_data_ack_tag;
+    return edge_protocol_set_bytes(
+               &output->payload.terminal_data_ack.terminal_id,
+               sizeof(output->payload.terminal_data_ack.terminal_id.bytes),
+               terminal_id, 16U) &&
+           (output->payload.terminal_data_ack.sequence = sequence) != 0U &&
+           send_envelope(session, output);
+}
+
+static void stage_terminal_input_ack(edge_ws_session *session, uint64_t sequence) {
+    if (sequence == 0U)
+        return;
+    session->terminal_input_ack_sequence = sequence;
+    session->terminal_input_ack_pending = true;
+    if (send_terminal_data_ack(session, session->terminal_id, sequence))
+        session->terminal_input_ack_pending = false;
+}
+
+static bool send_terminal_output(edge_ws_session *session) {
+    if (!session->terminal_output_pending || session->terminal_output_size == 0U ||
+        session->terminal_output_sequence == 0U)
+        return false;
+    iot_edge_v1_Envelope *output = &session->app->envelope;
+    if (!init_envelope(session, output))
+        return false;
+    output->which_payload = iot_edge_v1_Envelope_terminal_data_tag;
+    return edge_protocol_set_bytes(
+               &output->payload.terminal_data.terminal_id,
+               sizeof(output->payload.terminal_data.terminal_id.bytes),
+               session->terminal_id, sizeof(session->terminal_id)) &&
+           edge_protocol_set_bytes(
+               &output->payload.terminal_data.data,
+               sizeof(output->payload.terminal_data.data.bytes),
+               session->terminal_output, session->terminal_output_size) &&
+           (output->payload.terminal_data.sequence =
+                session->terminal_output_sequence) != 0U &&
+           send_envelope(session, output);
+}
+
+static void fail_terminal(edge_ws_session *session, const char *reason) {
+    uint8_t terminal_id[16];
+    memcpy(terminal_id, session->terminal_id, sizeof(terminal_id));
+    edge_terminal_close(terminal_id);
+    ev_timer_stop(session->app->loop, &session->terminal_timer);
+    session->terminal_open = false;
+    send_terminal_close(session, terminal_id, -1, reason);
+    reset_terminal_flow(session);
+}
+
 static void handle_terminal_open(edge_ws_session *session,
                                  const iot_edge_v1_TerminalOpen *request) {
     uint8_t terminal_id[16] = {0};
@@ -870,15 +951,15 @@ static void handle_terminal_open(edge_ws_session *session,
         send_terminal_close(session, terminal_id, -1, error);
         return;
     }
+    reset_terminal_flow(session);
     memcpy(session->terminal_id, terminal_id, sizeof(session->terminal_id));
     session->terminal_open = true;
-    /* The platform drains terminal input after node traffic. While a terminal
-     * is active, use a short heartbeat so interactive input is not delayed by
-     * the normal management heartbeat interval. */
-    ev_timer_stop(session->app->loop, &session->heartbeat_timer);
-    ev_timer_set(&session->heartbeat_timer, EDGE_TERMINAL_INPUT_POLL_INTERVAL,
-                 EDGE_TERMINAL_INPUT_POLL_INTERVAL);
-    ev_timer_start(session->app->loop, &session->heartbeat_timer);
+    if (!send_terminal_opened(session, terminal_id)) {
+        edge_terminal_close(terminal_id);
+        session->terminal_open = false;
+        reset_terminal_flow(session);
+        return;
+    }
     ev_timer_stop(session->app->loop, &session->terminal_timer);
     ev_timer_set(&session->terminal_timer, EDGE_TERMINAL_OUTPUT_POLL_INTERVAL,
                  EDGE_TERMINAL_OUTPUT_POLL_INTERVAL);
@@ -1013,23 +1094,55 @@ static void websocket_message(struct uwsc_client *client, void *data, size_t siz
             handle_terminal_open(session, &envelope->payload.terminal_open);
         break;
     case iot_edge_v1_Envelope_terminal_data_tag:
-        if (session->terminal_open)
-            (void)edge_terminal_write(&envelope->payload.terminal_data);
+        if (session->terminal_open) {
+            uint64_t acked_sequence = 0U;
+            const edge_terminal_input_result result =
+                edge_terminal_write(&envelope->payload.terminal_data,
+                                    &acked_sequence);
+            if (result == EDGE_TERMINAL_INPUT_ACKED)
+                stage_terminal_input_ack(session, acked_sequence);
+            else if (result == EDGE_TERMINAL_INPUT_ERROR)
+                fail_terminal(session, "terminal input sequence or write failed");
+        }
+        break;
+    case iot_edge_v1_Envelope_terminal_data_ack_tag:
+        if (session->terminal_open) {
+            const iot_edge_v1_TerminalDataAck *ack =
+                &envelope->payload.terminal_data_ack;
+            if (ack->terminal_id.size != 16U || ack->sequence == 0U ||
+                memcmp(ack->terminal_id.bytes, session->terminal_id,
+                       sizeof(session->terminal_id)) != 0 ||
+                (!session->terminal_output_pending &&
+                 ack->sequence != session->terminal_output_acked_sequence) ||
+                (session->terminal_output_pending &&
+                 ack->sequence != session->terminal_output_sequence)) {
+                fail_terminal(session, "terminal output acknowledgement mismatch");
+            } else if (session->terminal_output_pending) {
+                session->terminal_output_acked_sequence = ack->sequence;
+                session->terminal_output_size = 0U;
+                session->terminal_output_deadline_ms = 0U;
+                session->terminal_output_pending = false;
+                session->terminal_output_sent = false;
+            }
+        }
         break;
     case iot_edge_v1_Envelope_terminal_resize_tag:
-        if (session->terminal_open)
-            (void)edge_terminal_resize(&envelope->payload.terminal_resize);
+        if (session->terminal_open &&
+            !edge_terminal_resize(&envelope->payload.terminal_resize))
+            fail_terminal(session, "terminal resize failed");
         break;
     case iot_edge_v1_Envelope_terminal_close_tag:
-        if (session->terminal_open && envelope->payload.terminal_close.terminal_id.size == 16U) {
-            edge_terminal_close(envelope->payload.terminal_close.terminal_id.bytes);
-            ev_timer_stop(session->app->loop, &session->terminal_timer);
-            session->terminal_open = false;
-            ev_timer_stop(session->app->loop, &session->heartbeat_timer);
-            ev_timer_set(&session->heartbeat_timer,
-                         (ev_tstamp)session->heartbeat_interval_sec,
-                         (ev_tstamp)session->heartbeat_interval_sec);
-            ev_timer_start(session->app->loop, &session->heartbeat_timer);
+        if (session->terminal_open) {
+            if (envelope->payload.terminal_close.terminal_id.size != 16U ||
+                memcmp(envelope->payload.terminal_close.terminal_id.bytes,
+                       session->terminal_id, sizeof(session->terminal_id)) != 0) {
+                fail_terminal(session, "terminal close identity mismatch");
+            } else {
+                edge_terminal_close(session->terminal_id);
+                ev_timer_stop(session->app->loop, &session->terminal_timer);
+                session->terminal_open = false;
+                reset_terminal_flow(session);
+            }
         }
         break;
     case iot_edge_v1_Envelope_enrollment_pending_tag:
@@ -1052,12 +1165,6 @@ static void heartbeat_timer(struct ev_loop *loop, struct ev_timer *timer, int ev
     iot_edge_v1_Envelope *envelope = &session->app->envelope;
     if (!init_envelope(session, envelope))
         return;
-    if (session->terminal_open) {
-        envelope->which_payload = iot_edge_v1_Envelope_ping_tag;
-        envelope->payload.ping.nonce = 0U;
-        send_envelope(session, envelope);
-        return;
-    }
     envelope->which_payload = iot_edge_v1_Envelope_heartbeat_tag;
     iot_edge_v1_Heartbeat *heartbeat = &envelope->payload.heartbeat;
     heartbeat->signal_csq = 99U;
@@ -1245,33 +1352,56 @@ static void terminal_timer(struct ev_loop *loop, struct ev_timer *timer, int eve
     (void)loop;
     (void)events;
     edge_ws_session *session = session_from_terminal(timer);
+    if (!session->terminal_open)
+        return;
+    if (session->terminal_input_ack_pending &&
+        send_terminal_data_ack(session, session->terminal_id,
+                               session->terminal_input_ack_sequence))
+        session->terminal_input_ack_pending = false;
+
+    uint64_t input_acked_sequence = 0U;
+    const edge_terminal_input_result input_result =
+        edge_terminal_flush(&input_acked_sequence);
+    if (input_result == EDGE_TERMINAL_INPUT_ERROR) {
+        fail_terminal(session, "terminal input write failed");
+        return;
+    }
+    if (input_result == EDGE_TERMINAL_INPUT_ACKED)
+        stage_terminal_input_ack(session, input_acked_sequence);
+
+    const uint64_t now = monotonic_ms();
+    if (session->terminal_output_pending) {
+        if (now >= session->terminal_output_deadline_ms) {
+            fail_terminal(session, "terminal output acknowledgement timed out");
+            return;
+        }
+        if (!session->terminal_output_sent && send_terminal_output(session))
+            session->terminal_output_sent = true;
+        return;
+    }
+
     uint8_t terminal_id[16] = {0};
-    uint8_t data[4096];
     bool closed = false;
     int32_t exit_code = 0;
-    const ssize_t size = edge_terminal_read(terminal_id, data, sizeof(data), &closed, &exit_code);
+    const ssize_t size =
+        edge_terminal_read(terminal_id, session->terminal_output,
+                           sizeof(session->terminal_output), &closed, &exit_code);
     if (size > 0) {
-        iot_edge_v1_Envelope *output = &session->app->envelope;
-        if (init_envelope(session, output)) {
-            output->which_payload = iot_edge_v1_Envelope_terminal_data_tag;
-            edge_protocol_set_bytes(&output->payload.terminal_data.terminal_id,
-                                    sizeof(output->payload.terminal_data.terminal_id.bytes),
-                                    terminal_id, sizeof(terminal_id));
-            edge_protocol_set_bytes(&output->payload.terminal_data.data,
-                                    sizeof(output->payload.terminal_data.data.bytes),
-                                    data, (size_t)size);
-            send_envelope(session, output);
+        if (session->terminal_output_sequence == UINT64_MAX) {
+            fail_terminal(session, "terminal output sequence exhausted");
+            return;
         }
+        session->terminal_output_size = (size_t)size;
+        ++session->terminal_output_sequence;
+        session->terminal_output_pending = true;
+        session->terminal_output_sent = send_terminal_output(session);
+        session->terminal_output_deadline_ms = now + EDGE_TERMINAL_ACK_TIMEOUT_MS;
     }
     if (closed) {
         ev_timer_stop(session->app->loop, &session->terminal_timer);
         session->terminal_open = false;
         send_terminal_close(session, terminal_id, exit_code, "terminal closed");
-        ev_timer_stop(session->app->loop, &session->heartbeat_timer);
-        ev_timer_set(&session->heartbeat_timer,
-                     (ev_tstamp)session->heartbeat_interval_sec,
-                     (ev_tstamp)session->heartbeat_interval_sec);
-        ev_timer_start(session->app->loop, &session->heartbeat_timer);
+        reset_terminal_flow(session);
     }
 }
 
@@ -1501,6 +1631,7 @@ void edge_ws_app_stop(edge_ws_app *app) {
             edge_terminal_close(session->terminal_id);
             session->terminal_open = false;
         }
+        reset_terminal_flow(session);
         if (session->modem_worker_pid > 0) {
             (void)kill(session->modem_worker_pid, SIGTERM);
             bool reaped = false;

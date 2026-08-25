@@ -165,7 +165,13 @@ PB_BIND(iot_edge_v1_LogLevelResult, iot_edge_v1_LogLevelResult, AUTO)
 PB_BIND(iot_edge_v1_TerminalOpen, iot_edge_v1_TerminalOpen, AUTO)
 
 
+PB_BIND(iot_edge_v1_TerminalOpened, iot_edge_v1_TerminalOpened, AUTO)
+
+
 PB_BIND(iot_edge_v1_TerminalData, iot_edge_v1_TerminalData, 4)
+
+
+PB_BIND(iot_edge_v1_TerminalDataAck, iot_edge_v1_TerminalDataAck, AUTO)
 
 
 PB_BIND(iot_edge_v1_TerminalResize, iot_edge_v1_TerminalResize, AUTO)

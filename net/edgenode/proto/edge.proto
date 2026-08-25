@@ -653,9 +653,19 @@ message TerminalOpen {
   uint32 rows = 4;
 }
 
+message TerminalOpened {
+  bytes terminal_id = 1 [(nanopb).max_size = 16];
+}
+
 message TerminalData {
   bytes terminal_id = 1 [(nanopb).max_size = 16];
   bytes data = 2 [(nanopb).max_size = 4096];
+  uint64 sequence = 3;
+}
+
+message TerminalDataAck {
+  bytes terminal_id = 1 [(nanopb).max_size = 16];
+  uint64 sequence = 2;
 }
 
 message TerminalResize {
@@ -733,6 +743,8 @@ message Envelope {
     TerminalClose terminal_close = 73;
     LogLevelRequest log_level_request = 74;
     LogLevelResult log_level_result = 75;
+    TerminalOpened terminal_opened = 76;
+    TerminalDataAck terminal_data_ack = 77;
     Ping ping = 80;
     Pong pong = 81;
     Error error = 90;

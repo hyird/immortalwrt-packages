@@ -725,12 +725,24 @@ typedef struct _iot_edge_v1_TerminalOpen {
     uint32_t rows;
 } iot_edge_v1_TerminalOpen;
 
+typedef PB_BYTES_ARRAY_T(16) iot_edge_v1_TerminalOpened_terminal_id_t;
+typedef struct _iot_edge_v1_TerminalOpened {
+    iot_edge_v1_TerminalOpened_terminal_id_t terminal_id;
+} iot_edge_v1_TerminalOpened;
+
 typedef PB_BYTES_ARRAY_T(16) iot_edge_v1_TerminalData_terminal_id_t;
 typedef PB_BYTES_ARRAY_T(4096) iot_edge_v1_TerminalData_data_t;
 typedef struct _iot_edge_v1_TerminalData {
     iot_edge_v1_TerminalData_terminal_id_t terminal_id;
     iot_edge_v1_TerminalData_data_t data;
+    uint64_t sequence;
 } iot_edge_v1_TerminalData;
+
+typedef PB_BYTES_ARRAY_T(16) iot_edge_v1_TerminalDataAck_terminal_id_t;
+typedef struct _iot_edge_v1_TerminalDataAck {
+    iot_edge_v1_TerminalDataAck_terminal_id_t terminal_id;
+    uint64_t sequence;
+} iot_edge_v1_TerminalDataAck;
 
 typedef PB_BYTES_ARRAY_T(16) iot_edge_v1_TerminalResize_terminal_id_t;
 typedef struct _iot_edge_v1_TerminalResize {
@@ -813,6 +825,8 @@ typedef struct _iot_edge_v1_Envelope {
         iot_edge_v1_TerminalClose terminal_close;
         iot_edge_v1_LogLevelRequest log_level_request;
         iot_edge_v1_LogLevelResult log_level_result;
+        iot_edge_v1_TerminalOpened terminal_opened;
+        iot_edge_v1_TerminalDataAck terminal_data_ack;
         iot_edge_v1_Ping ping;
         iot_edge_v1_Pong pong;
         iot_edge_v1_Error error;
@@ -967,6 +981,8 @@ extern "C" {
 
 
 
+
+
 /* Initializer values for message structs */
 #define iot_edge_v1_Empty_init_default           {0}
 #define iot_edge_v1_Hello_init_default           {"", "", "", "", "", "", 0, 0, {0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, 0, 0, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, 0, 0, _iot_edge_v1_ModemSimState_MIN, "", "", 0, "", 0, 0, ""}
@@ -1021,7 +1037,9 @@ extern "C" {
 #define iot_edge_v1_LogLevelRequest_init_default {{0, {0}}, ""}
 #define iot_edge_v1_LogLevelResult_init_default  {{0, {0}}, 0, "", ""}
 #define iot_edge_v1_TerminalOpen_init_default    {{0, {0}}, {0, {0}}, 0, 0}
-#define iot_edge_v1_TerminalData_init_default    {{0, {0}}, {0, {0}}}
+#define iot_edge_v1_TerminalOpened_init_default  {{0, {0}}}
+#define iot_edge_v1_TerminalData_init_default    {{0, {0}}, {0, {0}}, 0}
+#define iot_edge_v1_TerminalDataAck_init_default {{0, {0}}, 0}
 #define iot_edge_v1_TerminalResize_init_default  {{0, {0}}, 0, 0}
 #define iot_edge_v1_TerminalClose_init_default   {{0, {0}}, 0, ""}
 #define iot_edge_v1_Ping_init_default            {0}
@@ -1081,7 +1099,9 @@ extern "C" {
 #define iot_edge_v1_LogLevelRequest_init_zero    {{0, {0}}, ""}
 #define iot_edge_v1_LogLevelResult_init_zero     {{0, {0}}, 0, "", ""}
 #define iot_edge_v1_TerminalOpen_init_zero       {{0, {0}}, {0, {0}}, 0, 0}
-#define iot_edge_v1_TerminalData_init_zero       {{0, {0}}, {0, {0}}}
+#define iot_edge_v1_TerminalOpened_init_zero     {{0, {0}}}
+#define iot_edge_v1_TerminalData_init_zero       {{0, {0}}, {0, {0}}, 0}
+#define iot_edge_v1_TerminalDataAck_init_zero    {{0, {0}}, 0}
 #define iot_edge_v1_TerminalResize_init_zero     {{0, {0}}, 0, 0}
 #define iot_edge_v1_TerminalClose_init_zero      {{0, {0}}, 0, ""}
 #define iot_edge_v1_Ping_init_zero               {0}
@@ -1440,8 +1460,12 @@ extern "C" {
 #define iot_edge_v1_TerminalOpen_ticket_tag      2
 #define iot_edge_v1_TerminalOpen_columns_tag     3
 #define iot_edge_v1_TerminalOpen_rows_tag        4
+#define iot_edge_v1_TerminalOpened_terminal_id_tag 1
 #define iot_edge_v1_TerminalData_terminal_id_tag 1
 #define iot_edge_v1_TerminalData_data_tag        2
+#define iot_edge_v1_TerminalData_sequence_tag    3
+#define iot_edge_v1_TerminalDataAck_terminal_id_tag 1
+#define iot_edge_v1_TerminalDataAck_sequence_tag 2
 #define iot_edge_v1_TerminalResize_terminal_id_tag 1
 #define iot_edge_v1_TerminalResize_columns_tag   2
 #define iot_edge_v1_TerminalResize_rows_tag      3
@@ -1499,6 +1523,8 @@ extern "C" {
 #define iot_edge_v1_Envelope_terminal_close_tag  73
 #define iot_edge_v1_Envelope_log_level_request_tag 74
 #define iot_edge_v1_Envelope_log_level_result_tag 75
+#define iot_edge_v1_Envelope_terminal_opened_tag 76
+#define iot_edge_v1_Envelope_terminal_data_ack_tag 77
 #define iot_edge_v1_Envelope_ping_tag            80
 #define iot_edge_v1_Envelope_pong_tag            81
 #define iot_edge_v1_Envelope_error_tag           90
@@ -2087,11 +2113,23 @@ X(a, STATIC,   SINGULAR, UINT32,   rows,              4)
 #define iot_edge_v1_TerminalOpen_CALLBACK NULL
 #define iot_edge_v1_TerminalOpen_DEFAULT NULL
 
+#define iot_edge_v1_TerminalOpened_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, BYTES,    terminal_id,       1)
+#define iot_edge_v1_TerminalOpened_CALLBACK NULL
+#define iot_edge_v1_TerminalOpened_DEFAULT NULL
+
 #define iot_edge_v1_TerminalData_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, BYTES,    terminal_id,       1) \
-X(a, STATIC,   SINGULAR, BYTES,    data,              2)
+X(a, STATIC,   SINGULAR, BYTES,    data,              2) \
+X(a, STATIC,   SINGULAR, UINT64,   sequence,          3)
 #define iot_edge_v1_TerminalData_CALLBACK NULL
 #define iot_edge_v1_TerminalData_DEFAULT NULL
+
+#define iot_edge_v1_TerminalDataAck_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, BYTES,    terminal_id,       1) \
+X(a, STATIC,   SINGULAR, UINT64,   sequence,          2)
+#define iot_edge_v1_TerminalDataAck_CALLBACK NULL
+#define iot_edge_v1_TerminalDataAck_DEFAULT NULL
 
 #define iot_edge_v1_TerminalResize_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, BYTES,    terminal_id,       1) \
@@ -2171,6 +2209,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (payload,terminal_resize,payload.terminal_res
 X(a, STATIC,   ONEOF,    MESSAGE,  (payload,terminal_close,payload.terminal_close),  73) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (payload,log_level_request,payload.log_level_request),  74) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (payload,log_level_result,payload.log_level_result),  75) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (payload,terminal_opened,payload.terminal_opened),  76) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (payload,terminal_data_ack,payload.terminal_data_ack),  77) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (payload,ping,payload.ping),  80) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (payload,pong,payload.pong),  81) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (payload,error,payload.error),  90)
@@ -2214,6 +2254,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (payload,error,payload.error),  90)
 #define iot_edge_v1_Envelope_payload_terminal_close_MSGTYPE iot_edge_v1_TerminalClose
 #define iot_edge_v1_Envelope_payload_log_level_request_MSGTYPE iot_edge_v1_LogLevelRequest
 #define iot_edge_v1_Envelope_payload_log_level_result_MSGTYPE iot_edge_v1_LogLevelResult
+#define iot_edge_v1_Envelope_payload_terminal_opened_MSGTYPE iot_edge_v1_TerminalOpened
+#define iot_edge_v1_Envelope_payload_terminal_data_ack_MSGTYPE iot_edge_v1_TerminalDataAck
 #define iot_edge_v1_Envelope_payload_ping_MSGTYPE iot_edge_v1_Ping
 #define iot_edge_v1_Envelope_payload_pong_MSGTYPE iot_edge_v1_Pong
 #define iot_edge_v1_Envelope_payload_error_MSGTYPE iot_edge_v1_Error
@@ -2271,7 +2313,9 @@ extern const pb_msgdesc_t iot_edge_v1_LogResult_msg;
 extern const pb_msgdesc_t iot_edge_v1_LogLevelRequest_msg;
 extern const pb_msgdesc_t iot_edge_v1_LogLevelResult_msg;
 extern const pb_msgdesc_t iot_edge_v1_TerminalOpen_msg;
+extern const pb_msgdesc_t iot_edge_v1_TerminalOpened_msg;
 extern const pb_msgdesc_t iot_edge_v1_TerminalData_msg;
+extern const pb_msgdesc_t iot_edge_v1_TerminalDataAck_msg;
 extern const pb_msgdesc_t iot_edge_v1_TerminalResize_msg;
 extern const pb_msgdesc_t iot_edge_v1_TerminalClose_msg;
 extern const pb_msgdesc_t iot_edge_v1_Ping_msg;
@@ -2333,7 +2377,9 @@ extern const pb_msgdesc_t iot_edge_v1_Envelope_msg;
 #define iot_edge_v1_LogLevelRequest_fields &iot_edge_v1_LogLevelRequest_msg
 #define iot_edge_v1_LogLevelResult_fields &iot_edge_v1_LogLevelResult_msg
 #define iot_edge_v1_TerminalOpen_fields &iot_edge_v1_TerminalOpen_msg
+#define iot_edge_v1_TerminalOpened_fields &iot_edge_v1_TerminalOpened_msg
 #define iot_edge_v1_TerminalData_fields &iot_edge_v1_TerminalData_msg
+#define iot_edge_v1_TerminalDataAck_fields &iot_edge_v1_TerminalDataAck_msg
 #define iot_edge_v1_TerminalResize_fields &iot_edge_v1_TerminalResize_msg
 #define iot_edge_v1_TerminalClose_fields &iot_edge_v1_TerminalClose_msg
 #define iot_edge_v1_Ping_fields &iot_edge_v1_Ping_msg
@@ -2400,8 +2446,10 @@ extern const pb_msgdesc_t iot_edge_v1_Envelope_msg;
 #define iot_edge_v1_TelemetryRecord_size         9760
 #define iot_edge_v1_TelemetryValue_size          466
 #define iot_edge_v1_TerminalClose_size           160
-#define iot_edge_v1_TerminalData_size            4117
+#define iot_edge_v1_TerminalDataAck_size         29
+#define iot_edge_v1_TerminalData_size            4128
 #define iot_edge_v1_TerminalOpen_size            96
+#define iot_edge_v1_TerminalOpened_size          18
 #define iot_edge_v1_TerminalResize_size          30
 
 #ifdef __cplusplus

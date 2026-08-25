@@ -32,14 +32,15 @@ static void test_hello_round_trip(void) {
     strcpy(envelope.payload.hello.imei, "490154203237518");
     strcpy(envelope.payload.hello.model, "openwrt-test");
     strcpy(envelope.payload.hello.software_version, "0.1.0");
+    envelope.payload.hello.supported_protocol_versions_count = 1U;
+    envelope.payload.hello.supported_protocol_versions[0] =
+        EDGENODE_PROTOCOL_VERSION;
     strcpy(envelope.payload.hello.iccid, "89860012345678901234");
     envelope.payload.hello.signal_csq = 23U;
     envelope.payload.hello.signal_rssi_dbm = -67;
     envelope.payload.hello.signal_percent = 74U;
     envelope.payload.hello.mobile_registered = true;
     envelope.payload.hello.mobile_registration_status = 1;
-    envelope.payload.hello.supported_protocol_versions_count = 1U;
-    envelope.payload.hello.supported_protocol_versions[0] = EDGENODE_PROTOCOL_VERSION;
 
     uint8_t encoded[EDGENODE_MAX_WS_MESSAGE];
     size_t encoded_size = 0U;
@@ -63,6 +64,10 @@ static void test_hello_round_trip(void) {
     require(decoded.payload.hello.mobile_registered &&
                 decoded.payload.hello.mobile_registration_status == 1,
             "mobile registration changed during round trip");
+    require(decoded.payload.hello.supported_protocol_versions_count == 1U &&
+                decoded.payload.hello.supported_protocol_versions[0] ==
+                    EDGENODE_PROTOCOL_VERSION,
+            "supported protocol advertisement changed during round trip");
     require(decoded.message_id.size == 16U && (decoded.message_id.bytes[6] >> 4U) == 7U,
             "message id is not UUIDv7");
     require((decoded.message_id.bytes[8] & 0xc0U) == 0x80U, "bad UUID variant");
@@ -103,6 +108,85 @@ static void test_heartbeat_mobile_state_round_trip(void) {
                 round_trip->signal_percent == 74U && round_trip->mobile_registered &&
                 round_trip->mobile_registration_status == 1,
             "heartbeat mobile state changed during round trip");
+}
+
+static void test_terminal_opened_round_trip(void) {
+    const uint8_t platform_id[16] = {0x01};
+    const uint8_t random_bytes[10] = {0x21};
+    const uint8_t terminal_id[16] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    };
+    iot_edge_v1_Envelope envelope;
+    require(edge_protocol_init_envelope(&envelope, platform_id, NULL, 0U, 3U,
+                                        1784688040123LL, random_bytes),
+            "terminal opened envelope initialization failed");
+    envelope.which_payload = iot_edge_v1_Envelope_terminal_opened_tag;
+    require(edge_protocol_set_bytes(&envelope.payload.terminal_opened.terminal_id,
+                                    sizeof(envelope.payload.terminal_opened.terminal_id.bytes),
+                                    terminal_id, sizeof(terminal_id)),
+            "terminal opened id setup failed");
+
+    uint8_t encoded[EDGENODE_MAX_WS_MESSAGE];
+    size_t encoded_size = 0U;
+    const char *error = NULL;
+    require(edge_protocol_encode(&envelope, encoded, sizeof(encoded), &encoded_size, &error),
+            error != NULL ? error : "terminal opened encode failed");
+    iot_edge_v1_Envelope decoded;
+    require(edge_protocol_decode(encoded, encoded_size, &decoded, &error),
+            error != NULL ? error : "terminal opened decode failed");
+    require(decoded.which_payload == iot_edge_v1_Envelope_terminal_opened_tag &&
+                decoded.payload.terminal_opened.terminal_id.size == 16U &&
+                memcmp(decoded.payload.terminal_opened.terminal_id.bytes, terminal_id, 16U) == 0,
+            "terminal opened acknowledgement changed identity");
+}
+
+static void test_terminal_flow_control_round_trip(void) {
+    const uint8_t platform_id[16] = {0x01};
+    const uint8_t random_bytes[10] = {0x22};
+    const uint8_t terminal_id[16] = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
+                                     0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b,
+                                     0x1c, 0x1d, 0x1e, 0x1f};
+    iot_edge_v1_Envelope envelope;
+    require(edge_protocol_init_envelope(&envelope, platform_id, NULL, 0U, 4U,
+                                        1784688050123LL, random_bytes),
+            "terminal data envelope initialization failed");
+    envelope.which_payload = iot_edge_v1_Envelope_terminal_data_tag;
+    require(edge_protocol_set_bytes(&envelope.payload.terminal_data.terminal_id,
+                                    sizeof(envelope.payload.terminal_data.terminal_id.bytes),
+                                    terminal_id, sizeof(terminal_id)) &&
+                edge_protocol_set_bytes(&envelope.payload.terminal_data.data,
+                                        sizeof(envelope.payload.terminal_data.data.bytes),
+                                        (const uint8_t *)"input", 5U),
+            "terminal data setup failed");
+    envelope.payload.terminal_data.sequence = 7U;
+
+    uint8_t encoded[EDGENODE_MAX_WS_MESSAGE];
+    size_t encoded_size = 0U;
+    const char *error = NULL;
+    require(edge_protocol_encode(&envelope, encoded, sizeof(encoded), &encoded_size, &error),
+            error != NULL ? error : "terminal data encode failed");
+    iot_edge_v1_Envelope decoded;
+    require(edge_protocol_decode(encoded, encoded_size, &decoded, &error) &&
+                decoded.which_payload == iot_edge_v1_Envelope_terminal_data_tag &&
+                decoded.payload.terminal_data.sequence == 7U,
+            error != NULL ? error : "terminal data sequence changed");
+
+    envelope.which_payload = iot_edge_v1_Envelope_terminal_data_ack_tag;
+    memset(&envelope.payload.terminal_data_ack, 0,
+           sizeof(envelope.payload.terminal_data_ack));
+    require(edge_protocol_set_bytes(
+                &envelope.payload.terminal_data_ack.terminal_id,
+                sizeof(envelope.payload.terminal_data_ack.terminal_id.bytes),
+                terminal_id, sizeof(terminal_id)),
+            "terminal acknowledgement id setup failed");
+    envelope.payload.terminal_data_ack.sequence = 7U;
+    require(edge_protocol_encode(&envelope, encoded, sizeof(encoded), &encoded_size, &error) &&
+                edge_protocol_decode(encoded, encoded_size, &decoded, &error) &&
+                decoded.which_payload ==
+                    iot_edge_v1_Envelope_terminal_data_ack_tag &&
+                decoded.payload.terminal_data_ack.sequence == 7U,
+            error != NULL ? error : "terminal acknowledgement changed");
 }
 
 static void test_modem_profile_round_trip(void) {
@@ -239,6 +323,10 @@ int main(void) {
     test_imei();
     test_hello_round_trip();
     test_heartbeat_mobile_state_round_trip();
+    require(EDGENODE_PROTOCOL_VERSION == 5U,
+            "terminal flow control did not advance the wire protocol");
+    test_terminal_opened_round_trip();
+    test_terminal_flow_control_round_trip();
     test_modem_profile_round_trip();
     test_cpp_protobuf_wire_contract();
     test_cpp_protobuf_config_digest_contract();

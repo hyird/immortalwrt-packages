@@ -6,7 +6,7 @@
 
 #include "edge.pb.h"
 
-#define EDGENODE_PROTOCOL_VERSION 3U
+#define EDGENODE_PROTOCOL_VERSION 5U
 #define EDGENODE_MAX_WS_MESSAGE 16384U
 
 bool edge_protocol_validate_imei(const char *imei);

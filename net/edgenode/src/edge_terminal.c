@@ -18,6 +18,11 @@ typedef struct {
     int master;
     pid_t child;
     uint8_t id[16];
+    uint8_t pending_input[4096];
+    size_t pending_input_size;
+    size_t pending_input_offset;
+    uint64_t pending_input_sequence;
+    uint64_t last_input_sequence;
 } terminal_state;
 
 static terminal_state terminal = {.master = -1, .child = -1};
@@ -59,7 +64,7 @@ bool edge_terminal_open(const iot_edge_v1_TerminalOpen *request,
         return false;
     }
     if (request == NULL || request->terminal_id.size != 16U ||
-        request->ticket.size < 16U || request->columns < 20U || request->columns > 500U ||
+        request->columns < 20U || request->columns > 500U ||
         request->rows < 5U || request->rows > 200U) {
         set_error(error, error_size, "terminal request is invalid");
         return false;
@@ -97,22 +102,54 @@ bool edge_terminal_open(const iot_edge_v1_TerminalOpen *request,
     return true;
 }
 
-bool edge_terminal_write(const iot_edge_v1_TerminalData *request) {
-    if (request == NULL || !same_terminal(&request->terminal_id) || request->data.size == 0U)
-        return false;
-    size_t offset = 0U;
-    while (offset < request->data.size) {
-        const ssize_t size = write(terminal.master, request->data.bytes + offset,
-                                   request->data.size - offset);
+edge_terminal_input_result edge_terminal_flush(uint64_t *acked_sequence) {
+    if (acked_sequence != NULL)
+        *acked_sequence = 0U;
+    if (terminal.master < 0)
+        return EDGE_TERMINAL_INPUT_ERROR;
+    if (terminal.pending_input_size == 0U)
+        return EDGE_TERMINAL_INPUT_IDLE;
+    while (terminal.pending_input_offset < terminal.pending_input_size) {
+        const ssize_t size = write(
+            terminal.master, terminal.pending_input + terminal.pending_input_offset,
+            terminal.pending_input_size - terminal.pending_input_offset);
         if (size > 0) {
-            offset += (size_t)size;
+            terminal.pending_input_offset += (size_t)size;
             continue;
         }
         if (size < 0 && errno == EINTR)
             continue;
-        return false;
+        if (size < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+            return EDGE_TERMINAL_INPUT_PENDING;
+        return EDGE_TERMINAL_INPUT_ERROR;
     }
-    return true;
+    terminal.last_input_sequence = terminal.pending_input_sequence;
+    terminal.pending_input_size = 0U;
+    terminal.pending_input_offset = 0U;
+    terminal.pending_input_sequence = 0U;
+    if (acked_sequence != NULL)
+        *acked_sequence = terminal.last_input_sequence;
+    return EDGE_TERMINAL_INPUT_ACKED;
+}
+
+edge_terminal_input_result edge_terminal_write(
+    const iot_edge_v1_TerminalData *request, uint64_t *acked_sequence) {
+    if (acked_sequence != NULL)
+        *acked_sequence = 0U;
+    if (request == NULL || !same_terminal(&request->terminal_id) ||
+        request->data.size == 0U || request->data.size > sizeof(terminal.pending_input) ||
+        request->sequence == 0U)
+        return EDGE_TERMINAL_INPUT_ERROR;
+    if (terminal.pending_input_size != 0U)
+        return EDGE_TERMINAL_INPUT_ERROR;
+    if (terminal.last_input_sequence == UINT64_MAX ||
+        request->sequence != terminal.last_input_sequence + 1U)
+        return EDGE_TERMINAL_INPUT_ERROR;
+    memcpy(terminal.pending_input, request->data.bytes, request->data.size);
+    terminal.pending_input_size = request->data.size;
+    terminal.pending_input_offset = 0U;
+    terminal.pending_input_sequence = request->sequence;
+    return edge_terminal_flush(acked_sequence);
 }
 
 bool edge_terminal_resize(const iot_edge_v1_TerminalResize *request) {
@@ -137,6 +174,18 @@ void edge_terminal_close(const uint8_t terminal_id[16]) {
     terminal.master = -1;
     terminal.child = -1;
 }
+
+#ifdef EDGENODE_TERMINAL_TEST
+bool edge_terminal_test_attach(int master, const uint8_t terminal_id[16]) {
+    if (master < 0 || terminal_id == NULL || terminal.master >= 0)
+        return false;
+    memset(&terminal, 0, sizeof(terminal));
+    terminal.master = master;
+    terminal.child = -1;
+    memcpy(terminal.id, terminal_id, sizeof(terminal.id));
+    return true;
+}
+#endif
 
 ssize_t edge_terminal_read(uint8_t terminal_id[16], uint8_t *output, size_t capacity,
                            bool *closed, int32_t *exit_code) {

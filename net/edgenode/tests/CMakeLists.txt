@@ -104,6 +104,18 @@ set_target_properties(edgenode_stability_x64 PROPERTIES
 add_test(NAME edgenode_stability COMMAND edgenode_stability_x64 --iterations 20000)
 
 if(UNIX)
+    add_executable(edge_terminal_test
+        edge_terminal_test.c
+        "${EDGENODE_ROOT}/src/edge_terminal.c")
+    target_compile_definitions(edge_terminal_test PRIVATE EDGENODE_TERMINAL_TEST=1)
+    target_include_directories(edge_terminal_test PRIVATE "${EDGENODE_ROOT}/src")
+    target_link_libraries(edge_terminal_test PRIVATE edgenode_nanopb)
+    find_library(UTIL_LIBRARY util)
+    if(UTIL_LIBRARY)
+        target_link_libraries(edge_terminal_test PRIVATE "${UTIL_LIBRARY}")
+    endif()
+    add_test(NAME edge_terminal COMMAND edge_terminal_test)
+
     add_executable(edge_process_test
         edge_process_test.c
         "${EDGENODE_ROOT}/src/edge_process.c")
