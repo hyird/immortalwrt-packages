@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=libwebsockets
 PKG_VERSION:=4.5.8
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
@@ -65,6 +65,7 @@ endef
 define Package/libwebsockets-notls
 	$(call Package/libwebsockets/Default)
 	TITLE += (without TLS)
+	DEPENDS += +libuv
 	VARIANT:=notls
 	PROVIDES:=libwebsockets
 	CONFLICTS:=libwebsockets-mbedtls libwebsockets-openssl libwebsockets-full
@@ -95,6 +96,10 @@ endif
 ifeq ($(BUILD_VARIANT),mbedtls)
     CMAKE_OPTIONS += -DLWS_WITH_SSL=ON
     CMAKE_OPTIONS += -DLWS_WITH_MBEDTLS=1
+endif
+
+ifeq ($(BUILD_VARIANT),notls)
+    CMAKE_OPTIONS += -DLWS_WITH_LIBUV=ON
 endif
 
 ifeq ($(BUILD_VARIANT),full)
