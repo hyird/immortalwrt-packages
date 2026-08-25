@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ttyd
 PKG_VERSION:=1.7.7
-PKG_RELEASE:=3
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/tsl0922/ttyd/tar.gz/$(PKG_VERSION)?
@@ -23,13 +23,25 @@ PKG_CPE_ID:=cpe:/a:ttyd_project:ttyd
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 
-define Package/ttyd
+define Package/ttyd/Default
 	SECTION:=utils
 	CATEGORY:=Utilities
 	TITLE:=Command-line tool for sharing terminal over the web
-	DEPENDS:=+libcap +libjson-c +libuv +zlib +libwebsockets-notls
 	URL:=https://github.com/tsl0922/ttyd
 	SUBMENU:=Terminal
+endef
+
+define Package/ttyd
+	$(call Package/ttyd/Default)
+	DEPENDS:=+libcap +libopenssl +libjson-c +libuv +zlib +libwebsockets-full
+endef
+
+define Package/ttyd-notls
+	$(call Package/ttyd/Default)
+	TITLE += (without TLS)
+	DEPENDS:=+libcap +libjson-c +libuv +zlib +libwebsockets-notls
+	PROVIDES:=ttyd
+	CONFLICTS:=ttyd
 endef
 
 define Package/ttyd/description
@@ -40,6 +52,8 @@ define Package/ttyd/conffiles
 /etc/config/ttyd
 endef
 
+Package/ttyd-notls/conffiles = $(Package/ttyd/conffiles)
+
 define Package/ttyd/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/ttyd $(1)/usr/bin/
@@ -49,4 +63,7 @@ define Package/ttyd/install
 	$(INSTALL_BIN) ./files/ttyd.init $(1)/etc/init.d/ttyd
 endef
 
+Package/ttyd-notls/install = $(Package/ttyd/install)
+
 $(eval $(call BuildPackage,ttyd))
+$(eval $(call BuildPackage,ttyd-notls))
