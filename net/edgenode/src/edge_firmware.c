@@ -12,10 +12,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <mbedtls/sha256.h>
-
 #include "edge_firmware_policy.h"
 #include "edge_process.h"
+#include "edge_sha256.h"
 
 #define FIRMWARE_IMAGE "/tmp/edgenode/firmware.bin"
 #define FIRMWARE_LOCK "/tmp/edgenode/firmware.lock"
@@ -131,11 +130,11 @@ static bool sha256_file(const char *path, uint8_t output[32]) {
         return false;
     mbedtls_sha256_context context;
     mbedtls_sha256_init(&context);
-    bool ok = mbedtls_sha256_starts_ret(&context, 0) == 0;
+    bool ok = edge_sha256_starts(&context, 0) == 0;
     uint8_t buffer[4096];
     while (ok) {
         const size_t size = fread(buffer, 1U, sizeof(buffer), input);
-        if (size != 0U && mbedtls_sha256_update_ret(&context, buffer, size) != 0)
+        if (size != 0U && edge_sha256_update(&context, buffer, size) != 0)
             ok = false;
         if (size < sizeof(buffer)) {
             if (ferror(input) != 0)
@@ -144,7 +143,7 @@ static bool sha256_file(const char *path, uint8_t output[32]) {
         }
     }
     if (ok)
-        ok = mbedtls_sha256_finish_ret(&context, output) == 0;
+        ok = edge_sha256_finish(&context, output) == 0;
     mbedtls_sha256_free(&context);
     fclose(input);
     return ok;
