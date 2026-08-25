@@ -1,0 +1,8 @@
+edgenode embeds nanopb 0.4.9.1 under the zlib license.
+https://github.com/nanopb/nanopb
+
+The OpenWrt libuwsc dependency is provided under the MIT license.
+https://github.com/zhaojh329/libuwsc
+
+WSS platform connections and HTTPS firmware downloads validate the server
+certificate and hostname against OpenWrt's ca-bundle trust store.

@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Keep the supervised main instance alive while the modem monitor discovers
+# the real device identity. Never invent or persist a placeholder IMEI.
+while :; do
+	imei="$(uci -q get edgenode.node.imei)"
+	if [ "${#imei}" -eq 15 ] && [ -n "${imei##*[!0-9]*}" ]; then
+		exec /usr/sbin/edgenode
+	fi
+	sleep 30
+done

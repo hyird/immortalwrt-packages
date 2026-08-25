@@ -1,0 +1,740 @@
+syntax = "proto3";
+
+package iot.edge.v1;
+
+import "nanopb.proto";
+
+enum Transport {
+  TRANSPORT_UNSPECIFIED = 0;
+  TRANSPORT_ETHERNET = 1;
+  TRANSPORT_SERIAL = 2;
+}
+
+enum LinkMode {
+  LINK_MODE_UNSPECIFIED = 0;
+  LINK_MODE_TCP_SERVER = 1;
+  LINK_MODE_TCP_CLIENT = 2;
+  LINK_MODE_SERIAL = 3;
+}
+
+enum Protocol {
+  PROTOCOL_UNSPECIFIED = 0;
+  PROTOCOL_SL651 = 1;
+  PROTOCOL_MODBUS = 2;
+  PROTOCOL_S7 = 3;
+}
+
+enum ConfigItemKind {
+  CONFIG_ITEM_UNSPECIFIED = 0;
+  CONFIG_ITEM_ENDPOINT = 1;
+  CONFIG_ITEM_DEVICE = 2;
+  CONFIG_ITEM_MODBUS_REGISTER = 3;
+  CONFIG_ITEM_S7_AREA = 4;
+  CONFIG_ITEM_SL651_FUNCTION = 5;
+  CONFIG_ITEM_SL651_ELEMENT = 6;
+  CONFIG_ITEM_SL651_DICTIONARY = 7;
+}
+
+enum ValueKind {
+  VALUE_UNSPECIFIED = 0;
+  VALUE_BOOL = 1;
+  VALUE_SIGNED = 2;
+  VALUE_UNSIGNED = 3;
+  VALUE_DOUBLE = 4;
+  VALUE_STRING = 5;
+  VALUE_BYTES = 6;
+}
+
+enum CommandState {
+  COMMAND_STATE_UNSPECIFIED = 0;
+  COMMAND_STATE_ACCEPTED = 1;
+  COMMAND_STATE_RUNNING = 2;
+  COMMAND_STATE_SUCCEEDED = 3;
+  COMMAND_STATE_READBACK_MISMATCH = 4;
+  COMMAND_STATE_DEVICE_OFFLINE = 5;
+  COMMAND_STATE_TIMED_OUT = 6;
+  COMMAND_STATE_REJECTED = 7;
+  COMMAND_STATE_FAILED = 8;
+}
+
+enum NetworkAddressMode {
+  NETWORK_ADDRESS_UNSPECIFIED = 0;
+  NETWORK_ADDRESS_DHCP = 1;
+  NETWORK_ADDRESS_STATIC = 2;
+  NETWORK_ADDRESS_NONE = 3;
+}
+
+enum NetworkConfigOperation {
+  NETWORK_CONFIG_UNSPECIFIED = 0;
+  NETWORK_CONFIG_UPSERT = 1;
+  NETWORK_CONFIG_DELETE = 2;
+}
+
+enum FirmwareUpdateState {
+  FIRMWARE_UPDATE_UNSPECIFIED = 0;
+  FIRMWARE_UPDATE_ACCEPTED = 1;
+  FIRMWARE_UPDATE_DOWNLOADING = 2;
+  FIRMWARE_UPDATE_VERIFYING = 3;
+  FIRMWARE_UPDATE_FLASHING = 4;
+  FIRMWARE_UPDATE_FAILED = 5;
+}
+
+enum ModemSimState {
+  MODEM_SIM_UNSPECIFIED = 0;
+  MODEM_SIM_UNKNOWN = 1;
+  MODEM_SIM_READY = 2;
+  MODEM_SIM_NOT_INSERTED = 3;
+  MODEM_SIM_PIN_REQUIRED = 4;
+  MODEM_SIM_PUK_REQUIRED = 5;
+  MODEM_SIM_BLOCKED = 6;
+}
+
+enum ModemControlAction {
+  MODEM_CONTROL_UNSPECIFIED = 0;
+  MODEM_CONTROL_APPLY_PROFILE = 1;
+  MODEM_CONTROL_REDIAL = 2;
+}
+
+enum ModemControlState {
+  MODEM_CONTROL_STATE_UNSPECIFIED = 0;
+  MODEM_CONTROL_ACCEPTED = 1;
+  MODEM_CONTROL_RUNNING = 2;
+  MODEM_CONTROL_SUCCEEDED = 3;
+  MODEM_CONTROL_FAILED = 4;
+}
+
+enum ModemPdpType {
+  MODEM_PDP_UNSPECIFIED = 0;
+  MODEM_PDP_IPV4 = 1;
+  MODEM_PDP_IPV6 = 2;
+  MODEM_PDP_IPV4V6 = 3;
+}
+
+enum ModemAuthType {
+  MODEM_AUTH_UNSPECIFIED = 0;
+  MODEM_AUTH_NONE = 1;
+  MODEM_AUTH_PAP = 2;
+  MODEM_AUTH_CHAP = 3;
+  MODEM_AUTH_PAP_OR_CHAP = 4;
+}
+
+enum PlatformConfigOperation {
+  PLATFORM_CONFIG_UNSPECIFIED = 0;
+  PLATFORM_CONFIG_UPSERT = 1;
+  PLATFORM_CONFIG_DELETE = 2;
+}
+
+message Empty {}
+
+message Hello {
+  reserved 7;
+  reserved "enrollment_token";
+  string imei = 1 [(nanopb).max_length = 15];
+  string model = 2 [(nanopb).max_length = 128];
+  string software_version = 3 [(nanopb).max_length = 32];
+  string hostname = 4 [(nanopb).max_length = 64];
+  string architecture = 5 [(nanopb).max_length = 32];
+  string openwrt_release = 6 [(nanopb).max_length = 64];
+  uint64 last_applied_config_version = 8;
+  repeated uint32 supported_protocol_versions = 9 [(nanopb).max_count = 8];
+  bool supports_tcp = 10;
+  bool supports_serial = 11;
+  bool supports_network_config = 12;
+  bool supports_terminal = 13;
+  bool supports_l2_maintenance = 14;
+  bool supports_firmware_update = 15;
+  string iccid = 16 [(nanopb).max_length = 22];
+  uint32 signal_csq = 17;
+  int32 signal_rssi_dbm = 18;
+  uint32 signal_percent = 19;
+  bool mobile_registered = 20;
+  int32 mobile_registration_status = 21;
+  bool supports_platform_config = 22;
+  bool supports_device_config = 23;
+  uint32 network_config_version = 24;
+  bool modem_available = 25;
+  ModemSimState sim_state = 26;
+  string apn = 27 [(nanopb).max_length = 100];
+  string mobile_operator = 28 [(nanopb).max_length = 64];
+  bool mobile_connected = 29;
+  string mobile_ipv4 = 30 [(nanopb).max_length = 15];
+  bool supports_modem_control = 31;
+  bool supports_logs = 32;
+  string log_level = 33 [(nanopb).max_length = 8];
+}
+
+message HelloAck {
+  bytes assigned_node_id = 1 [(nanopb).max_size = 16];
+  uint64 session_epoch = 2;
+  uint32 negotiated_protocol_version = 3;
+  uint32 heartbeat_interval_sec = 4;
+  uint32 max_message_size = 5;
+  int64 platform_time_ms = 6;
+}
+
+message EnrollmentStatus {
+  string code = 1 [(nanopb).max_length = 32];
+  string message = 2 [(nanopb).max_length = 192];
+}
+
+message InterfaceCapability {
+  string name = 1 [(nanopb).max_length = 32];
+  string display_name = 2 [(nanopb).max_length = 64];
+  bytes mac = 3 [(nanopb).max_size = 6];
+  bool up = 4;
+  bool bridge = 5;
+  string ipv4 = 6 [(nanopb).max_length = 15];
+  uint32 prefix_length = 7;
+  string gateway = 8 [(nanopb).max_length = 15];
+  repeated string bridge_ports = 9 [(nanopb).max_count = 8, (nanopb).max_length = 32];
+}
+
+message NetworkCapability {
+  string name = 1 [(nanopb).max_length = 32];
+  NetworkAddressMode mode = 2;
+  string device = 3 [(nanopb).max_length = 32];
+  bool up = 4;
+  bool bridge = 5;
+  repeated string bridge_ports = 6 [(nanopb).max_count = 8, (nanopb).max_length = 32];
+  string ipv4 = 7 [(nanopb).max_length = 15];
+  uint32 prefix_length = 8;
+  string gateway = 9 [(nanopb).max_length = 15];
+}
+
+message SerialCapability {
+  string path = 1 [(nanopb).max_length = 96];
+  string display_name = 2 [(nanopb).max_length = 64];
+  bool available = 3;
+  bool rs485 = 4;
+}
+
+message CapabilityReport {
+  repeated InterfaceCapability interfaces = 1 [(nanopb).max_count = 16];
+  repeated SerialCapability serial_ports = 2 [(nanopb).max_count = 8];
+  string network_stack = 3 [(nanopb).max_length = 32];
+  bool ttyd_available = 4;
+  repeated NetworkCapability networks = 5 [(nanopb).max_count = 8];
+}
+
+message Heartbeat {
+  uint64 uptime_sec = 1;
+  uint64 active_config_version = 2;
+  uint32 managed_endpoint_count = 3;
+  uint32 managed_device_count = 4;
+  uint64 outbox_records = 5;
+  uint64 outbox_bytes = 6;
+  uint64 free_storage_bytes = 7;
+  uint32 cpu_load_milli = 8;
+  uint64 memory_used_bytes = 9;
+  string iccid = 10 [(nanopb).max_length = 22];
+  uint32 signal_csq = 11;
+  int32 signal_rssi_dbm = 12;
+  uint32 signal_percent = 13;
+  bool mobile_registered = 14;
+  int32 mobile_registration_status = 15;
+  bool modem_available = 16;
+  ModemSimState sim_state = 17;
+  string apn = 18 [(nanopb).max_length = 100];
+  string mobile_operator = 19 [(nanopb).max_length = 64];
+  bool mobile_connected = 20;
+  string mobile_ipv4 = 21 [(nanopb).max_length = 15];
+  bool supports_modem_control = 22;
+  string log_level = 23 [(nanopb).max_length = 8];
+}
+
+message HeartbeatAck {
+  int64 platform_time_ms = 1;
+  bool request_capability_report = 2;
+  bool request_device_status = 3;
+}
+
+message DeviceStatus {
+  bytes device_id = 1 [(nanopb).max_size = 16];
+  string state = 2 [(nanopb).max_length = 24];
+  string reason = 3 [(nanopb).max_length = 128];
+  uint32 client_count = 4;
+  repeated string clients = 5 [(nanopb).max_count = 8, (nanopb).max_length = 64];
+  int64 last_activity_at_ms = 6;
+}
+
+message DeviceStatusReport {
+  repeated DeviceStatus devices = 1 [(nanopb).max_count = 8];
+}
+
+message EventReport {
+  string event_type = 1 [(nanopb).max_length = 48];
+  string level = 2 [(nanopb).max_length = 16];
+  string message = 3 [(nanopb).max_length = 192];
+  bytes related_id = 4 [(nanopb).max_size = 16];
+  uint64 config_version = 5;
+  string detail = 6 [(nanopb).max_length = 512];
+}
+
+message ConfigBegin {
+  uint64 revision = 1;
+  uint32 item_count = 2;
+  bytes sha256 = 3 [(nanopb).max_size = 32];
+}
+
+message SerialSettings {
+  string channel = 1 [(nanopb).max_length = 96];
+  uint32 baud_rate = 2;
+  uint32 data_bits = 3;
+  uint32 stop_bits = 4;
+  string parity = 5 [(nanopb).max_length = 8];
+  bool rs485 = 6;
+  uint32 rs485_rts_delay_before_us = 7;
+  uint32 rs485_rts_delay_after_us = 8;
+}
+
+message EndpointConfig {
+  bytes endpoint_id = 1 [(nanopb).max_size = 16];
+  string name = 2 [(nanopb).max_length = 100];
+  Transport transport = 3;
+  LinkMode mode = 4;
+  Protocol protocol = 5;
+  string ip = 6 [(nanopb).max_length = 64];
+  uint32 port = 7;
+  SerialSettings serial = 8;
+  bool enabled = 9;
+  // The exact interface name reported by the node. TCP sockets bind to this
+  // interface; serial endpoints use SerialSettings.channel as the device path.
+  string interface_name = 10 [(nanopb).max_length = 32];
+}
+
+message DeviceConfig {
+  reserved 23;
+  reserved "registration_payload";
+  bytes device_id = 1 [(nanopb).max_size = 16];
+  bytes endpoint_id = 2 [(nanopb).max_size = 16];
+  string device_code = 3 [(nanopb).max_length = 100];
+  string name = 4 [(nanopb).max_length = 100];
+  Protocol protocol = 5;
+  string timezone = 6 [(nanopb).max_length = 64];
+  // Southbound DTU I/O is fixed at 1000 ms in protocol v1. A value of zero means
+  // the same 1000 ms default; other values are rejected instead of silently
+  // changing the device sampling cadence.
+  uint32 io_interval_ms = 7;
+  // Telemetry reporting is deliberately independent from the one-second DTU I/O
+  // loop. Each origin platform may configure its own reporting interval.
+  uint32 report_interval_sec = 8;
+  uint32 online_timeout_sec = 9;
+  uint32 modbus_slave_id = 10;
+  string modbus_mode = 11 [(nanopb).max_length = 8];
+  uint32 modbus_merge_gap = 12;
+  uint32 modbus_max_quantity = 13;
+  string s7_connection_mode = 14 [(nanopb).max_length = 16];
+  string s7_connection_type = 15 [(nanopb).max_length = 16];
+  uint32 s7_rack = 16;
+  uint32 s7_slot = 17;
+  string s7_local_tsap = 18 [(nanopb).max_length = 8];
+  string s7_remote_tsap = 19 [(nanopb).max_length = 8];
+  uint32 command_fast_read_duration_sec = 20;
+  uint32 command_fast_read_interval_sec = 21;
+  bytes heartbeat_payload = 22 [(nanopb).max_size = 256];
+  bool enabled = 24;
+}
+
+message ModbusRegisterConfig {
+  bytes device_id = 1 [(nanopb).max_size = 16];
+  string element_id = 2 [(nanopb).max_length = 64];
+  string name = 3 [(nanopb).max_length = 100];
+  string unit = 4 [(nanopb).max_length = 32];
+  string register_type = 5 [(nanopb).max_length = 24];
+  string data_type = 6 [(nanopb).max_length = 24];
+  string byte_order = 7 [(nanopb).max_length = 24];
+  uint32 address = 8;
+  uint32 quantity = 9;
+  double scale = 10;
+  int32 decimals = 11;
+  bool writable = 12;
+}
+
+message S7AreaConfig {
+  bytes device_id = 1 [(nanopb).max_size = 16];
+  string element_id = 2 [(nanopb).max_length = 64];
+  string name = 3 [(nanopb).max_length = 100];
+  string unit = 4 [(nanopb).max_length = 32];
+  string area = 5 [(nanopb).max_length = 16];
+  uint32 db_number = 6;
+  uint32 start = 7;
+  uint32 start_bit = 8;
+  uint32 size = 9;
+  string data_type = 10 [(nanopb).max_length = 24];
+  double scale = 11;
+  int32 decimals = 12;
+  bool writable = 13;
+}
+
+message Sl651FunctionConfig {
+  bytes device_id = 1 [(nanopb).max_size = 16];
+  string function_code = 2 [(nanopb).max_length = 16];
+  string name = 3 [(nanopb).max_length = 100];
+  string direction = 4 [(nanopb).max_length = 8];
+}
+
+message Sl651ElementConfig {
+  bytes device_id = 1 [(nanopb).max_size = 16];
+  string function_code = 2 [(nanopb).max_length = 16];
+  string element_id = 3 [(nanopb).max_length = 64];
+  string name = 4 [(nanopb).max_length = 100];
+  string unit = 5 [(nanopb).max_length = 32];
+  string encoding = 6 [(nanopb).max_length = 16];
+  uint32 length = 7;
+  uint32 digits = 8;
+  bytes guide = 9 [(nanopb).max_size = 64];
+  bool response_element = 10;
+  bool writable = 11;
+}
+
+message Sl651DictionaryConfig {
+  bytes device_id = 1 [(nanopb).max_size = 16];
+  string function_code = 2 [(nanopb).max_length = 16];
+  string element_id = 3 [(nanopb).max_length = 64];
+  string source_value = 4 [(nanopb).max_length = 64];
+  string mapped_value = 5 [(nanopb).max_length = 128];
+  string dependency_element_id = 6 [(nanopb).max_length = 64];
+  string dependency_operator = 7 [(nanopb).max_length = 8];
+  string dependency_value = 8 [(nanopb).max_length = 64];
+}
+
+message ConfigItem {
+  uint64 revision = 1;
+  uint32 index = 2;
+  ConfigItemKind kind = 3;
+  bytes sha256 = 4 [(nanopb).max_size = 32];
+  oneof item {
+    EndpointConfig endpoint = 10;
+    DeviceConfig device = 11;
+    ModbusRegisterConfig modbus_register = 12;
+    S7AreaConfig s7_area = 13;
+    Sl651FunctionConfig sl651_function = 14;
+    Sl651ElementConfig sl651_element = 15;
+    Sl651DictionaryConfig sl651_dictionary = 16;
+  }
+}
+
+message ConfigCommit {
+  uint64 revision = 1;
+  bytes sha256 = 2 [(nanopb).max_size = 32];
+}
+
+message ConfigApplied {
+  uint64 revision = 1;
+  bytes sha256 = 2 [(nanopb).max_size = 32];
+  uint32 endpoint_count = 3;
+  uint32 device_count = 4;
+}
+
+message ConfigRejected {
+  uint64 revision = 1;
+  string code = 2 [(nanopb).max_length = 32];
+  string message = 3 [(nanopb).max_length = 256];
+  uint32 failed_item_index = 4;
+}
+
+message ScalarValue {
+  ValueKind kind = 1;
+  oneof value {
+    bool bool_value = 2;
+    sint64 signed_value = 3;
+    uint64 unsigned_value = 4;
+    double double_value = 5;
+    string string_value = 6 [(nanopb).max_length = 128];
+    bytes bytes_value = 7 [(nanopb).max_size = 256];
+  }
+}
+
+message TelemetryValue {
+  string element_id = 1 [(nanopb).max_length = 64];
+  string name = 2 [(nanopb).max_length = 100];
+  string unit = 3 [(nanopb).max_length = 32];
+  ScalarValue value = 4;
+}
+
+message TelemetryRecord {
+  bytes record_id = 1 [(nanopb).max_size = 16];
+  bytes device_id = 2 [(nanopb).max_size = 16];
+  bytes endpoint_id = 3 [(nanopb).max_size = 16];
+  Protocol protocol = 4;
+  string function_code = 5 [(nanopb).max_length = 24];
+  string function_name = 6 [(nanopb).max_length = 100];
+  string direction = 7 [(nanopb).max_length = 8];
+  int64 observed_at_ms = 8;
+  repeated TelemetryValue values = 9 [(nanopb).max_count = 16];
+  bytes raw_payload = 10 [(nanopb).max_size = 2048];
+}
+
+message TelemetryBatch {
+  repeated TelemetryRecord records = 1 [(nanopb).max_count = 1];
+}
+
+message TelemetryAck {
+  repeated bytes accepted_record_ids = 1 [
+    (nanopb).max_count = 1,
+    (nanopb).max_size = 16
+  ];
+}
+
+message RawPacket {
+  bytes packet_id = 1 [(nanopb).max_size = 16];
+  bytes endpoint_id = 2 [(nanopb).max_size = 16];
+  bytes device_id = 3 [(nanopb).max_size = 16];
+  string client_address = 4 [(nanopb).max_length = 64];
+  int64 observed_at_ms = 5;
+  bytes payload = 6 [(nanopb).max_size = 4096];
+}
+
+message RawPacketAck {
+  bytes packet_id = 1 [(nanopb).max_size = 16];
+}
+
+message CommandValue {
+  string element_id = 1 [(nanopb).max_length = 64];
+  ScalarValue expected = 2;
+}
+
+message CommandRequest {
+  bytes command_id = 1 [(nanopb).max_size = 16];
+  bytes device_id = 2 [(nanopb).max_size = 16];
+  repeated CommandValue values = 3 [(nanopb).max_count = 8];
+  uint32 timeout_ms = 4;
+  uint32 readback_count = 5;
+  uint32 fast_read_duration_sec = 6;
+  uint32 fast_read_interval_sec = 7;
+}
+
+message CommandProgress {
+  bytes command_id = 1 [(nanopb).max_size = 16];
+  CommandState state = 2;
+  string message = 3 [(nanopb).max_length = 192];
+}
+
+message CommandResult {
+  bytes command_id = 1 [(nanopb).max_size = 16];
+  CommandState state = 2;
+  string message = 3 [(nanopb).max_length = 256];
+  repeated TelemetryValue actual_values = 4 [(nanopb).max_count = 8];
+  bool write_ack_missing = 5;
+  int64 completed_at_ms = 6;
+  bytes device_id = 7 [(nanopb).max_size = 16];
+}
+
+message CommandResultAck {
+  bytes command_id = 1 [(nanopb).max_size = 16];
+}
+
+message NetworkInterfaceConfig {
+  string name = 1 [(nanopb).max_length = 32];
+  NetworkAddressMode mode = 2;
+  string ip = 3 [(nanopb).max_length = 15];
+  uint32 prefix_length = 4;
+  string gateway = 5 [(nanopb).max_length = 15];
+  bool bridge = 6;
+  repeated string bridge_ports = 7 [(nanopb).max_count = 8, (nanopb).max_length = 32];
+  bool delete_bridge = 8;
+  NetworkConfigOperation operation = 9;
+  string logical_name = 10 [(nanopb).max_length = 32];
+  string device = 11 [(nanopb).max_length = 32];
+  string previous_logical_name = 12 [(nanopb).max_length = 32];
+}
+
+message NetworkConfigRequest {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  repeated NetworkInterfaceConfig interfaces = 2 [(nanopb).max_count = 8];
+  uint32 rollback_timeout_sec = 3;
+}
+
+message NetworkConfigResult {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  bool success = 2;
+  bool rolled_back = 3;
+  string message = 4 [(nanopb).max_length = 256];
+}
+
+message FirmwareUpdateRequest {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  string download_url = 2 [(nanopb).max_length = 512];
+  bytes sha256 = 3 [(nanopb).max_size = 32];
+  uint64 size_bytes = 4;
+  string version = 5 [(nanopb).max_length = 64];
+  bool keep_settings = 6;
+}
+
+message FirmwareUpdateResult {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  FirmwareUpdateState state = 2;
+  string message = 3 [(nanopb).max_length = 256];
+  uint64 downloaded_bytes = 4;
+  uint64 total_bytes = 5;
+  uint32 progress_percent = 6;
+}
+
+message ModemControlRequest {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  ModemControlAction action = 2;
+  string apn = 3 [(nanopb).max_length = 100];
+  bool automatic_apn = 4;
+  string username = 5 [(nanopb).max_length = 64];
+  // Credentials and PIN are transport-only secrets. The server must not persist them in task JSON.
+  string password = 6 [(nanopb).max_length = 128];
+  ModemPdpType pdp_type = 7;
+  ModemAuthType auth_type = 8;
+  string pin_code = 9 [(nanopb).max_length = 8];
+  bool redial_after_apply = 10;
+}
+
+message ModemControlResult {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  ModemControlAction action = 2;
+  ModemControlState state = 3;
+  string message = 4 [(nanopb).max_length = 256];
+  string apn = 5 [(nanopb).max_length = 100];
+}
+
+message PlatformConfigRequest {
+  reserved 6;
+  reserved "enrollment_token";
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  PlatformConfigOperation operation = 2;
+  bytes target_platform_id = 3 [(nanopb).max_size = 16];
+  string name = 4 [(nanopb).max_length = 32];
+  string url = 5 [(nanopb).max_length = 255];
+  bool enabled = 7;
+  uint32 priority = 8;
+  uint32 reconnect_interval_sec = 9;
+  uint32 outbox_max_bytes = 10;
+}
+
+message PlatformConfigResult {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  bool success = 2;
+  string message = 3 [(nanopb).max_length = 256];
+}
+
+message LogRequest {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  uint32 limit = 2;
+  string level = 3 [(nanopb).max_length = 8];
+  string source = 4 [(nanopb).max_length = 16];
+}
+
+message LogLine {
+  int64 time_ms = 1;
+  string level = 2 [(nanopb).max_length = 8];
+  string source = 3 [(nanopb).max_length = 16];
+  string message = 4 [(nanopb).max_length = 96];
+  string detail = 5 [(nanopb).max_length = 128];
+}
+
+message LogResult {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  bool success = 2;
+  string message = 3 [(nanopb).max_length = 96];
+  repeated LogLine lines = 4 [(nanopb).max_count = 48];
+}
+
+message LogLevelRequest {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  string level = 2 [(nanopb).max_length = 8];
+}
+
+message LogLevelResult {
+  bytes request_id = 1 [(nanopb).max_size = 16];
+  bool success = 2;
+  string level = 3 [(nanopb).max_length = 8];
+  string message = 4 [(nanopb).max_length = 96];
+}
+
+message TerminalOpen {
+  bytes terminal_id = 1 [(nanopb).max_size = 16];
+  bytes ticket = 2 [(nanopb).max_size = 64];
+  uint32 columns = 3;
+  uint32 rows = 4;
+}
+
+message TerminalData {
+  bytes terminal_id = 1 [(nanopb).max_size = 16];
+  bytes data = 2 [(nanopb).max_size = 4096];
+}
+
+message TerminalResize {
+  bytes terminal_id = 1 [(nanopb).max_size = 16];
+  uint32 columns = 2;
+  uint32 rows = 3;
+}
+
+message TerminalClose {
+  bytes terminal_id = 1 [(nanopb).max_size = 16];
+  int32 exit_code = 2;
+  string reason = 3 [(nanopb).max_length = 128];
+}
+
+message Ping {
+  uint64 nonce = 1;
+}
+
+message Pong {
+  uint64 nonce = 1;
+}
+
+message Error {
+  string code = 1 [(nanopb).max_length = 48];
+  string message = 2 [(nanopb).max_length = 256];
+  bool retryable = 3;
+}
+
+message Envelope {
+  uint32 protocol_version = 1;
+  bytes message_id = 2 [(nanopb).max_size = 16];
+  bytes node_id = 3 [(nanopb).max_size = 16];
+  bytes platform_id = 4 [(nanopb).max_size = 16];
+  uint64 session_epoch = 5;
+  int64 created_at_ms = 6;
+  bytes causation_id = 7 [(nanopb).max_size = 16];
+  uint64 sequence = 8;
+
+  oneof payload {
+    Hello hello = 20;
+    HelloAck hello_ack = 21;
+    EnrollmentStatus enrollment_pending = 22;
+    EnrollmentStatus enrollment_rejected = 23;
+    Heartbeat heartbeat = 24;
+    HeartbeatAck heartbeat_ack = 25;
+    CapabilityReport capability_report = 26;
+    DeviceStatusReport device_status_report = 27;
+    EventReport event_report = 28;
+    ConfigBegin config_begin = 30;
+    ConfigItem config_item = 31;
+    ConfigCommit config_commit = 32;
+    ConfigApplied config_applied = 33;
+    ConfigRejected config_rejected = 34;
+    TelemetryBatch telemetry_batch = 40;
+    TelemetryAck telemetry_ack = 41;
+    RawPacket raw_packet = 42;
+    RawPacketAck raw_packet_ack = 43;
+    CommandRequest command_request = 50;
+    CommandProgress command_progress = 51;
+    CommandResult command_result = 52;
+    CommandResultAck command_result_ack = 53;
+    NetworkConfigRequest network_config_request = 60;
+    NetworkConfigResult network_config_result = 61;
+    FirmwareUpdateRequest firmware_update_request = 62;
+    FirmwareUpdateResult firmware_update_result = 63;
+    PlatformConfigRequest platform_config_request = 64;
+    PlatformConfigResult platform_config_result = 65;
+    ModemControlRequest modem_control_request = 66;
+    ModemControlResult modem_control_result = 67;
+    LogRequest log_request = 68;
+    LogResult log_result = 69;
+    TerminalOpen terminal_open = 70;
+    TerminalData terminal_data = 71;
+    TerminalResize terminal_resize = 72;
+    TerminalClose terminal_close = 73;
+    LogLevelRequest log_level_request = 74;
+    LogLevelResult log_level_result = 75;
+    Ping ping = 80;
+    Pong pong = 81;
+    Error error = 90;
+  }
+}

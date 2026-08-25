@@ -1,0 +1,39 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+platform_count=0
+legacy_config_changed=0
+
+cleanup_platform() {
+	local section="$1"
+
+	platform_count=$((platform_count + 1))
+	if uci -q get "edgenode.$section.enrollment_token_file" >/dev/null; then
+		uci -q delete "edgenode.$section.enrollment_token_file"
+		legacy_config_changed=1
+	fi
+}
+
+rm -rf -- /etc/edgenode/credentials
+
+config_load edgenode
+config_foreach cleanup_platform platform
+
+[ "$legacy_config_changed" -eq 0 ] || uci -q commit edgenode
+
+[ "$platform_count" -ne 0 ] && exit 0
+
+uci -q batch <<'EOF'
+set edgenode.bootstrap=platform
+set edgenode.bootstrap.id='00000000-0000-7000-8000-000000000001'
+set edgenode.bootstrap.name='默认平台'
+set edgenode.bootstrap.url='https://i.a-z.xin'
+set edgenode.bootstrap.enabled='1'
+set edgenode.bootstrap.priority='0'
+set edgenode.bootstrap.reconnect_interval_sec='5'
+set edgenode.bootstrap.outbox_max_bytes='262144'
+commit edgenode
+EOF
+
+exit 0
