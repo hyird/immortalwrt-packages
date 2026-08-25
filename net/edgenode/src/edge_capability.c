@@ -255,12 +255,9 @@ static void collect_logical_networks(iot_edge_v1_CapabilityReport *report,
     uci_free_context(context);
 }
 
-bool edge_capability_has_ttyd(void) {
-    static const char *paths[] = {"/usr/bin/ttyd", "/usr/sbin/ttyd", "/bin/ttyd"};
-    for (size_t index = 0; index < sizeof(paths) / sizeof(paths[0]); ++index)
-        if (access(paths[index], X_OK) == 0)
-            return true;
-    return false;
+bool edge_capability_has_terminal(void) {
+    return access("/bin/ash", X_OK) == 0 &&
+           access("/dev/ptmx", R_OK | W_OK) == 0;
 }
 
 bool edge_capability_collect_network(iot_edge_v1_CapabilityReport *report,

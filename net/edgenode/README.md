@@ -25,8 +25,8 @@ Implemented foundations:
   command requires readback equality;
 - an unresponsive S7 PLC closes the TCP socket and repeats TCP, COTP, and S7 Setup
   Communication on the next one-second cycle.
-- network and serial capabilities are reported automatically; when `ttyd` is installed,
-  the platform exposes an authenticated remote terminal;
+- network and serial capabilities are reported automatically; the built-in PTY bridge
+  exposes an authenticated remote terminal without a separate terminal daemon;
 - bootstrap-authorized commands can create, update, or delete UCI logical interfaces
   backed by one physical device or a bridge, using DHCP or static IPv4. The configured
   4G/WAN interface and its descendants are excluded, and an unconfirmed network change

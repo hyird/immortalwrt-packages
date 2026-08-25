@@ -248,7 +248,7 @@ static bool send_hello(edge_ws_session *session) {
     hello->supports_tcp = true;
     hello->supports_serial = true;
     hello->supports_network_config = session->config->network_owner;
-    hello->supports_terminal = edge_capability_has_ttyd();
+    hello->supports_terminal = edge_capability_has_terminal();
     hello->supports_firmware_update = session->config->bootstrap;
     hello->supports_device_config = true;
     hello->network_config_version = 3U;
@@ -288,7 +288,7 @@ static bool send_capability_report(edge_ws_session *session) {
     envelope->which_payload = iot_edge_v1_Envelope_capability_report_tag;
     iot_edge_v1_CapabilityReport *report = &envelope->payload.capability_report;
     safe_copy(report->network_stack, sizeof(report->network_stack), "netifd");
-    report->ttyd_available = edge_capability_has_ttyd();
+    report->ttyd_available = edge_capability_has_terminal();
     (void)edge_capability_collect_network(report, session->app->config->wan_interface);
     if (session->app->config->serial_port[0] != '\0') {
         report->serial_ports_count = 1U;
@@ -1009,7 +1009,7 @@ static void websocket_message(struct uwsc_client *client, void *data, size_t siz
         break;
     case iot_edge_v1_Envelope_terminal_open_tag:
         if (session->enrolled && session->config->bootstrap &&
-            edge_capability_has_ttyd())
+            edge_capability_has_terminal())
             handle_terminal_open(session, &envelope->payload.terminal_open);
         break;
     case iot_edge_v1_Envelope_terminal_data_tag:

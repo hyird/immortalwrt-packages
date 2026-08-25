@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=libwebsockets
 PKG_VERSION:=4.5.8
-PKG_RELEASE:=3
+PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
@@ -36,7 +36,6 @@ CMAKE_OPTIONS += -DISABLE_WERROR=ON
 CMAKE_OPTIONS += -DCMAKE_BUILD_TYPE=Release
 CMAKE_OPTIONS += -DLWS_WITH_EXTERNAL_POLL=ON
 CMAKE_OPTIONS += -DLWS_WITH_ULOOP=ON
-CMAKE_OPTIONS += -DLWS_WITH_SSL=OFF
 
 # turn off all test apps
 CMAKE_OPTIONS += -DLWS_WITHOUT_TESTAPPS=ON
@@ -62,15 +61,6 @@ define Package/libwebsockets-openssl
 	CONFLICTS:=libwebsockets-full
 endef
 
-define Package/libwebsockets-notls
-	$(call Package/libwebsockets/Default)
-	TITLE += (without TLS)
-	DEPENDS += +libuv
-	VARIANT:=notls
-	PROVIDES:=libwebsockets
-	CONFLICTS:=libwebsockets-mbedtls libwebsockets-openssl libwebsockets-full
-endef
-
 define Package/libwebsockets-mbedtls
 	$(call Package/$(PKG_NAME)/Default)
 	TITLE += (mbedTLS)
@@ -94,12 +84,7 @@ ifeq ($(BUILD_VARIANT),openssl)
 endif
 
 ifeq ($(BUILD_VARIANT),mbedtls)
-    CMAKE_OPTIONS += -DLWS_WITH_SSL=ON
     CMAKE_OPTIONS += -DLWS_WITH_MBEDTLS=1
-endif
-
-ifeq ($(BUILD_VARIANT),notls)
-    CMAKE_OPTIONS += -DLWS_WITH_LIBUV=ON
 endif
 
 ifeq ($(BUILD_VARIANT),full)
@@ -120,8 +105,6 @@ endef
 
 Package/libwebsockets-mbedtls/install = $(Package/libwebsockets/install)
 Package/libwebsockets-openssl/install = $(Package/libwebsockets/install)
-Package/libwebsockets-notls/install = $(Package/libwebsockets/install)
-
 define Package/libwebsockets-full/install
 	$(call Package/libwebsockets/install,$(1))
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libwebsockets-evlib_uv.so* $(1)/usr/lib
@@ -129,5 +112,4 @@ endef
 
 $(eval $(call BuildPackage,libwebsockets-openssl))
 $(eval $(call BuildPackage,libwebsockets-mbedtls))
-$(eval $(call BuildPackage,libwebsockets-notls))
 $(eval $(call BuildPackage,libwebsockets-full))

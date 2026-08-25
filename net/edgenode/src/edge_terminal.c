@@ -54,8 +54,8 @@ static bool same_terminal(const void *field) {
 
 bool edge_terminal_open(const iot_edge_v1_TerminalOpen *request,
                         char *error, size_t error_size) {
-    if (!edge_capability_has_ttyd()) {
-        set_error(error, error_size, "ttyd is not installed");
+    if (!edge_capability_has_terminal()) {
+        set_error(error, error_size, "terminal PTY is unavailable");
         return false;
     }
     if (request == NULL || request->terminal_id.size != 16U ||
